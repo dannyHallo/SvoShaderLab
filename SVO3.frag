@@ -4,19 +4,14 @@ const float root_size = 3.;
 const int levels = 5;
 const int MAX_ITER = 222;
 
-/*
-int voxels[] = int[](1,1,1,1,3,1,0,3,
-                        0,2,2,2,0,2,0,0,
-                        0,0,0,4,4,0,4,0,
-                                                0,0,4,0,0,4,0,4,
-                         5,5,5,0,5,0,0,0,
-                         0,0,0,0,6,0,0,0,
-                         0,7,0,0,7,0,7,0,
-                        -1,0,-1,0,0,-1,0,0);
-*/
+int voxels[] =
+    int[](1, 1, 1, 1, 3, 1, 0, 3, 0, 2, 2, 2, 0, 2, 0, 0, 0, 0, 0, 4, 4, 0, 4,
+          0, 0, 0, 4, 0, 0, 4, 0, 4, 5, 5, 5, 0, 5, 0, 0, 0, 0, 0, 0, 0, 6, 0,
+          0, 0, 0, 7, 0, 0, 7, 0, 7, 0, -1, 0, -1, 0, 0, -1, 0, 0);
 
-int voxels[] = int[](1, 0, 0, 1, 0, -1, -1, -1, 2, 0, 0, 0, 0, 0, 0, 0, -1, 0,
-                     0, 0, 0, 0, 0, -1);
+// int voxels[] = int[](1, 0, 0, 1, 0, -1, -1, -1, 2, 0, 0, 0, 0, 0, 0, 0, -1,
+// 0,
+//                      0, 0, 0, 0, 0, -1);
 
 const float[6] scale_lookup = float[6](1., .5, .25, .125, .0625, .03125);
 
@@ -64,7 +59,6 @@ bool trace(out vec2 t, out vec3 pos, out int iter, out float size, in vec3 ro,
   vec3 idx = mix(-sign(rd), sign(rd), lessThanEqual(tmid, vec3(t.x)));
   int stackIdx = 0;
   int scale = 1;
-  // level 1 size
   size *= 0.5;
   // move to first hitted sub-cell center
   pos += 0.5 * size * idx;
@@ -154,45 +148,49 @@ void getCamRay(out vec3 rayPos, out vec3 rayDir, vec2 uv) {
   // [-1, 1] in both axis
   vec2 screenPos = uv * 2.0 - 1.0;
 
-  vec3 cameraDir = vec3(0.0, 0.0, 1.0);
-  vec3 cameraPlaneU = vec3(1.0, 0.0, 0.0);
-  vec3 cameraPlaneV = vec3(0.0, 1.0, 0.0) * iResolution.y / iResolution.x;
+  // vec3 cameraDir = vec3(0.0, 0.0, 1.0);
+  // vec3 cameraPlaneU = vec3(1.0, 0.0, 0.0);
+  // vec3 cameraPlaneV = vec3(0.0, 1.0, 0.0) * iResolution.y / iResolution.x;
 
-  rayDir = cameraDir + screenPos.x * cameraPlaneU + screenPos.y * cameraPlaneV;
-  rayPos = vec3(0.0, 0.25 * sin(iTime * 2.7), -4.0);
+  // rayDir = cameraDir + screenPos.x * cameraPlaneU + screenPos.y *
+  // cameraPlaneV; rayPos = vec3(0.0, 0.25 * sin(iTime * 2.7), -4.0);
 
-  // rotate camera to orbit the object with time
-  rayPos.xz = rotate2d(rayPos.xz, iTime);
-  rayDir.xz = rotate2d(rayDir.xz, iTime);
-}
+  // // rotate camera to orbit the object with time
+  // rayPos.xz = rotate2d(rayPos.xz, iTime);
+  // rayDir.xz = rotate2d(rayDir.xz, iTime);
 
-void mainImage(out vec4 fragColor, in vec2 fragCoord) {
+  // ---
 
-  vec2 uv = fragCoord / iResolution.xy;
-  uv *= 2.0;
-  uv -= 1.0;
-  uv.x *= iResolution.x / iResolution.y;
+  screenPos.x *= iResolution.x / iResolution.y;
 
   float r = 12.0 * iMouse.x / iResolution.x;
 
-  vec3 ro = vec3(8.0 * sin(0.5 * r), 1.5 - iMouse.y / iResolution.y,
-                 8. * cos(0.5 * r));
+  rayPos = vec3(8.0 * sin(0.5 * r), 1.5 - iMouse.y / iResolution.y,
+                8. * cos(0.5 * r));
   vec3 lookAt = vec3(0.0);
-  vec3 cameraDir = normalize(lookAt - ro);
+  vec3 cameraDir = normalize(lookAt - rayPos);
   vec3 up = vec3(0.0, 1.0, 0.0);
   vec3 left = normalize(cross(cameraDir, up)); // Might be right
-  vec3 rd = cameraDir;
+  rayDir = cameraDir;
   float FOV = 0.4; // Not actual FOV, just a multiplier
-  rd += FOV * up * uv.y;
-  rd += FOV * left * uv.x;
-  // `rd` is now a point on the film plane, so turn it back to a direction
-  rd = normalize(rd);
+  rayDir += FOV * up * screenPos.y;
+  rayDir += FOV * left * screenPos.x;
+  // `rayDir` is now a point on the film plane, so turn it back to a direction
+  rayDir = normalize(rayDir);
+}
+
+void mainImage(out vec4 fragColor, in vec2 fragCoord) {
+  vec2 uv = fragCoord.xy / iResolution.xy;
+  vec3 rayPos, rayDir;
+  getCamRay(rayPos, rayDir, uv);
+
+  // ---
 
   vec2 t;
   vec3 pos;
   float size;
   int iter;
-  bool hit = trace( t, pos, iter, size, ro, rd);
+  bool hit = trace(t, pos, iter, size, rayPos, rayDir);
   vec3 col = hit ? vec3((t.x - 6.) * .5, 0., 0.) : vec3(.0, 0., 0.);
 
   // fragColor = vec4(vec3(float(iter)/float(MAX_ITER)),1.);

@@ -39,7 +39,7 @@ bool BBoxIntersect(const vec3 boxMin, const vec3 boxMax, const Ray r,
   return t1 > max(t0, 0.0);
 }
 
-vec4 trace(Ray ray, inout Hit hit) {
+vec4 trace(out Hit hit, Ray ray) {
   vec3 center = vec3(0.0f);
   float scale = 1.0f;
   vec3 minBox = center - scale;
@@ -103,7 +103,7 @@ vec4 trace(Ray ray, inout Hit hit) {
         continue;
       }
 
-      // not empty, but a leaf
+      // not empty, but a leaf, return red
       if (is_leaf) {
         return vec4(1.0f, 0.0f, 0.0f, 1.0f);
       }
@@ -151,7 +151,7 @@ void mainImage(out vec4 fragColor, in vec2 fragCoord) {
   ray.o = rayPos;
   ray.d = rayDir;
   ray.invDir = 1.0f / rayDir;
-  vec4 color = trace(ray, hit);
+  vec4 color = trace(hit, ray);
   if (length(color) > 0.5f) {
     fragColor = color;
   }
