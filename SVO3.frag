@@ -1,6 +1,6 @@
 // https://www.shadertoy.com/view/3d2XRd
 
-const float root_size = 3.;
+const float root_size = 1.0;
 const int levels = 5;
 const int MAX_ITER = 222;
 
@@ -15,22 +15,26 @@ int voxels[] =
 
 const float[6] scale_lookup = float[6](1., .5, .25, .125, .0625, .03125);
 
-vec2 isect(in vec3 pos, in float size, in vec3 ro, in vec3 rd, out vec3 tmid,
-           out vec3 tmax) {
-  vec3 mn = pos - 0.5 * size;
-  vec3 mx = mn + size;
-  vec3 t1 = (mn - ro) / rd;
-  vec3 t2 = (mx - ro) / rd;
+// returns t0 and t1, also fills tmid and tmax
+void isect(out float tcmin, out float tcmax, out vec3 tmid, out vec3 tmax,
+           in vec3 pos, in float size, in vec3 rayPos, in vec3 rayDir) {
+  vec3 minCorner = pos - 0.5 * size;
+  vec3 maxCorner = pos + 0.5 * size;
+  // xyz components of t for the ray to get to the 3 planes of minCorner
+  vec3 t1 = (minCorner - rayPos) / rayDir;
+  // xyz ...
+  vec3 t2 = (maxCorner - rayPos) / rayDir;
   vec3 tmin = min(t1, t2);
   tmax = max(t1, t2);
-  tmid = (pos - ro) / rd; // tmax;
-  return vec2(max(tmin.x, max(tmin.y, tmin.z)),
-              min(tmax.x, min(tmax.y, tmax.z)));
+  tmid = (tmin + tmax) * 0.5;
+
+  tcmin = max(tmin.x, max(tmin.y, tmin.z));
+  tcmax = min(tmax.x, min(tmax.y, tmax.z));
 }
 
-bool trace(out vec2 t, out vec3 pos, out int iter, out float size, in vec3 ro,
-           in vec3 rd) {
-
+// returns true if hit, false if miss
+bool trace(out float tcmin, out float tcmax, out vec3 pos, out int iter,
+           out float size, in vec3 rayPos, in vec3 rayDir) {
   struct ST {
     vec3 pos;
     int scale; // size = root_size * exp2(float(-scale));
@@ -46,17 +50,15 @@ bool trace(out vec2 t, out vec3 pos, out int iter, out float size, in vec3 ro,
   size = root_size;
   vec3 root_pos = vec3(0);
   pos = root_pos;
-  vec3 tmid;
-  vec3 tmax;
+  vec3 tmid, tmax;
   bool can_push = true;
-  float d;
-  t = isect(pos, size, ro, rd, tmid, tmax);
-  float h = t.y;
+  isect(tcmin, tcmax, tmid, tmax, pos, size, rayPos, rayDir);
+  float h = tcmax;
 
   // Initial push, sort of
   // If the minimum is before the middle in this axis, we need to go to the
-  // first one (-rd)
-  vec3 idx = mix(-sign(rd), sign(rd), lessThanEqual(tmid, vec3(t.x)));
+  // first one (-rayDir)
+  vec3 idx = mix(-sign(rayDir), sign(rayDir), lessThanEqual(tmid, vec3(tcmin)));
   int stackIdx = 0;
   int scale = 1;
   size *= 0.5;
@@ -65,7 +67,7 @@ bool trace(out vec2 t, out vec3 pos, out int iter, out float size, in vec3 ro,
 
   iter = MAX_ITER;
   while (iter-- > 0) {
-    t = isect(pos, size, ro, rd, tmid, tmax);
+    isect(tcmin, tcmax, tmid, tmax, pos, size, rayPos, rayDir);
 
     float subIdx = dot(idx * .5 + .5, vec3(1., 2., 4.));
     int curIdx = stackIdx * 8 + int(subIdx);
@@ -77,15 +79,15 @@ bool trace(out vec2 t, out vec3 pos, out int iter, out float size, in vec3 ro,
       if (can_push) {
         //-- PUSH --//
 
-        // t.y is this voxel exist dist,h is parent voxel exist dist
-        if (t.y < h) {
+        // tcmax is this voxel exist dist,h is parent voxel exist dist
+        if (tcmax < h) {
           stack[stack_ptr++] = ST(pos, scale, idx, stackIdx, h);
         }
 
-        h = t.y;
+        h = tcmax;
         scale++;
         size *= 0.5;
-        idx = mix(-sign(rd), sign(rd), step(tmid, vec3(t.x)));
+        idx = mix(-sign(rayDir), sign(rayDir), step(tmid, vec3(tcmin)));
 
         stackIdx = voxels[curIdx];
 
@@ -104,10 +106,10 @@ bool trace(out vec2 t, out vec3 pos, out int iter, out float size, in vec3 ro,
     // this is genius,for the hitted direction,if hit point is in the middle,we
     // advance to the other side, else if hit point is in the edge,it will leave
     // the stack.and keep all unhitted direction
-    idx = mix(idx, sign(rd), equal(tmax, vec3(t.y)));
+    idx = mix(idx, sign(rayDir), equal(tmax, vec3(tcmax)));
 
     // if old = idx → stay,else → move forward in this stack
-    pos += mix(vec3(0.), sign(rd), notEqual(old, idx)) * size;
+    pos += mix(vec3(0.), sign(rayDir), notEqual(old, idx)) * size;
 
     // if idx hasn't changed, we're at the last child in this voxel
     if (idx == old) {
@@ -144,54 +146,36 @@ vec2 rotate2d(vec2 v, float a) {
   return vec2(v.x * cosA - v.y * sinA, v.y * cosA + v.x * sinA);
 }
 
-void getCamRay(out vec3 rayPos, out vec3 rayDir, vec2 uv) {
+void rayGen(out vec3 rayPos, out vec3 rayDir, vec2 uv) {
   // [-1, 1] in both axis
   vec2 screenPos = uv * 2.0 - 1.0;
 
-  // vec3 cameraDir = vec3(0.0, 0.0, 1.0);
-  // vec3 cameraPlaneU = vec3(1.0, 0.0, 0.0);
-  // vec3 cameraPlaneV = vec3(0.0, 1.0, 0.0) * iResolution.y / iResolution.x;
+  vec3 cameraDir = vec3(0.0, 0.0, 1.0);
+  vec3 cameraPlaneU = vec3(1.0, 0.0, 0.0);
+  vec3 cameraPlaneV = vec3(0.0, 1.0, 0.0) * iResolution.y / iResolution.x;
 
-  // rayDir = cameraDir + screenPos.x * cameraPlaneU + screenPos.y *
-  // cameraPlaneV; rayPos = vec3(0.0, 0.25 * sin(iTime * 2.7), -4.0);
+  rayDir = cameraDir + screenPos.x * cameraPlaneU + screenPos.y * cameraPlaneV;
+  rayPos = vec3(0.0, 0.25 * sin(iTime * 2.7), -1.2);
 
-  // // rotate camera to orbit the object with time
-  // rayPos.xz = rotate2d(rayPos.xz, iTime);
-  // rayDir.xz = rotate2d(rayDir.xz, iTime);
-
-  // ---
-
-  screenPos.x *= iResolution.x / iResolution.y;
-
-  float r = 12.0 * iMouse.x / iResolution.x;
-
-  rayPos = vec3(8.0 * sin(0.5 * r), 1.5 - iMouse.y / iResolution.y,
-                8. * cos(0.5 * r));
-  vec3 lookAt = vec3(0.0);
-  vec3 cameraDir = normalize(lookAt - rayPos);
-  vec3 up = vec3(0.0, 1.0, 0.0);
-  vec3 left = normalize(cross(cameraDir, up)); // Might be right
-  rayDir = cameraDir;
-  float FOV = 0.4; // Not actual FOV, just a multiplier
-  rayDir += FOV * up * screenPos.y;
-  rayDir += FOV * left * screenPos.x;
-  // `rayDir` is now a point on the film plane, so turn it back to a direction
-  rayDir = normalize(rayDir);
+  // rotate camera to orbit the object with time
+  rayPos.xz = rotate2d(rayPos.xz, iTime);
+  rayDir.xz = rotate2d(rayDir.xz, iTime);
 }
 
 void mainImage(out vec4 fragColor, in vec2 fragCoord) {
+  // step 1: ray gen
   vec2 uv = fragCoord.xy / iResolution.xy;
   vec3 rayPos, rayDir;
-  getCamRay(rayPos, rayDir, uv);
+  rayGen(rayPos, rayDir, uv);
 
-  // ---
-
-  vec2 t;
+  // step 2: ray march
+  float tcmin, tcmax;
   vec3 pos;
   float size;
   int iter;
-  bool hit = trace(t, pos, iter, size, rayPos, rayDir);
-  vec3 col = hit ? vec3((t.x - 6.) * .5, 0., 0.) : vec3(.0, 0., 0.);
+  bool hit = trace(tcmin, tcmax, pos, iter, size, rayPos, rayDir);
+  vec3 col = hit ? vec3(1) : vec3(0);
+  // vec3 col = hit ? vec3((tcmin - 6.) * .5, 0., 0.) : vec3(.0, 0., 0.);
 
   // fragColor = vec4(vec3(float(iter)/float(MAX_ITER)),1.);
   fragColor = vec4(col, 1.0);
