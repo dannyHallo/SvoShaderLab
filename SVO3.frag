@@ -75,14 +75,17 @@ bool trace(out float tcmin, out float tcmax, out vec3 pos, out int iter,
 
   iter = MAX_ITER;
   while (iter-- > 0) {
-    isect(tcmin, tcmax, tmid, tmax, pos, size, rayPos, rayDir);
-
     float subIdx = dot(idx * .5 + .5, vec3(1., 2., 4.));
     int curIdx = stackIdx * 8 + int(subIdx);
 
-    if (voxels[curIdx] != 0) { // voxel exists
-      if (scale >= levels)     // hits the smallest voxel;
+    isect(tcmin, tcmax, tmid, tmax, pos, size, rayPos, rayDir);
+
+    // voxel exists
+    if (voxels[curIdx] != 0) {
+      // hits the smallest voxel
+      if (scale >= levels) {
         return true;
+      }
 
       if (can_push) {
         //-- PUSH --//
@@ -166,7 +169,11 @@ void rayGen(out vec3 rayPos, out vec3 rayDir, vec2 uv) {
   vec3 cameraPlaneV = vec3(0.0, 1.0, 0.0) * iResolution.y / iResolution.x;
 
   rayDir = cameraDir + screenPos.x * cameraPlaneU + screenPos.y * cameraPlaneV;
-  rayPos = vec3(0.0, 0.25 * sin(iTime * 2.7), -1.2);
+
+  const float kFloatingFreq = 2.0;
+  const float kFloatingAmp = 0.15;
+  const float kOrbitingDist = 1.2;
+  rayPos = vec3(0.0, kFloatingAmp * sin(iTime * kFloatingFreq), kOrbitingDist);
 
   // rotate camera to orbit the object with time
   rayPos.xz = rotate2d(rayPos.xz, iTime);
