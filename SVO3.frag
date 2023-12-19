@@ -16,8 +16,8 @@ int voxels[] =
 const float[6] scale_lookup = float[6](1., .5, .25, .125, .0625, .03125);
 
 // returns t0 and t1, also fills tmid and tmax
-void isect(out float tcmin, out float tcmax, out vec3 tmid, out vec3 tmax,
-           in vec3 pos, in float size, in vec3 rayPos, in vec3 rayDir) {
+bool isect(out float tcmin, out float tcmax, out vec3 tmid, out vec3 tmax,
+           vec3 pos, float size, vec3 rayPos, vec3 rayDir) {
   vec3 minCorner = pos - 0.5 * size;
   vec3 maxCorner = pos + 0.5 * size;
   // xyz components of t for the ray to get to the 3 planes of minCorner
@@ -30,6 +30,8 @@ void isect(out float tcmin, out float tcmax, out vec3 tmid, out vec3 tmax,
 
   tcmin = max(tmin.x, max(tmin.y, tmin.z));
   tcmax = min(tmax.x, min(tmax.y, tmax.z));
+
+  return tcmin <= tcmax;
 }
 
 // returns true if hit, false if miss
@@ -52,13 +54,19 @@ bool trace(out float tcmin, out float tcmax, out vec3 pos, out int iter,
   pos = root_pos;
   vec3 tmid, tmax;
   bool can_push = true;
-  isect(tcmin, tcmax, tmid, tmax, pos, size, rayPos, rayDir);
+  bool is_intersect_with_root =
+      isect(tcmin, tcmax, tmid, tmax, pos, size, rayPos, rayDir);
+  if (!is_intersect_with_root) {
+    return false;
+  }
   float h = tcmax;
 
   // Initial push, sort of
   // If the minimum is before the middle in this axis, we need to go to the
   // first one (-rayDir)
-  vec3 idx = mix(-sign(rayDir), sign(rayDir), lessThanEqual(tmid, vec3(tcmin)));
+  // for x component, if tmid.x <= tcmin, idx.x = agrees with rayDir.x, else
+  // idx.x = -rayDir.x, same for y and z
+  vec3 idx = mix(-sign(rayDir), sign(rayDir), step(tmid, vec3(tcmin)));
   int stackIdx = 0;
   int scale = 1;
   size *= 0.5;
@@ -72,14 +80,14 @@ bool trace(out float tcmin, out float tcmax, out vec3 pos, out int iter,
     float subIdx = dot(idx * .5 + .5, vec3(1., 2., 4.));
     int curIdx = stackIdx * 8 + int(subIdx);
 
-    if (voxels[curIdx] != 0) { // Voxel exists
-      if (scale >= levels)     // //hit the smallest voxel;
+    if (voxels[curIdx] != 0) { // voxel exists
+      if (scale >= levels)     // hits the smallest voxel;
         return true;
 
       if (can_push) {
         //-- PUSH --//
 
-        // tcmax is this voxel exist dist,h is parent voxel exist dist
+        // tcmax is this voxel exist dist, h is parent voxel exist dist
         if (tcmax < h) {
           stack[stack_ptr++] = ST(pos, scale, idx, stackIdx, h);
         }
@@ -87,6 +95,9 @@ bool trace(out float tcmin, out float tcmax, out vec3 pos, out int iter,
         h = tcmax;
         scale++;
         size *= 0.5;
+
+        // step: for element i of the return value, 0.0 is returned if x[i] <
+        // edge[i], and 1.0 is returned otherwise.
         idx = mix(-sign(rayDir), sign(rayDir), step(tmid, vec3(tcmin)));
 
         stackIdx = voxels[curIdx];
