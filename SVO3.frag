@@ -45,9 +45,9 @@ bool trace(out float tcmin, out float tcmax, out vec3 pos, out int iter,
     float h;
   } stack[levels];
 
-  int stack_ptr = 0; // Next open index
+  int stack_ptr = 0;
 
-  //-- INITIALIZE --//
+  // STEP 1: initialize
 
   size = root_size;
   vec3 root_pos = vec3(0);
@@ -61,11 +61,9 @@ bool trace(out float tcmin, out float tcmax, out vec3 pos, out int iter,
   }
   float h = tcmax;
 
-  // Initial push, sort of
-  // If the minimum is before the middle in this axis, we need to go to the
-  // first one (-rayDir)
-  // for x component, if tmid.x <= tcmin, idx.x = agrees with rayDir.x, else
-  // idx.x = -rayDir.x, same for y and z
+  // initial push
+  // for x component, if tcmin < tmid.x, idx.x reverts the ray dir in x axis,
+  // same for y and z
   vec3 idx = mix(-sign(rayDir), sign(rayDir), step(tmid, vec3(tcmin)));
   int stackIdx = 0;
   int scale = 1;
