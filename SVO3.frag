@@ -1,17 +1,17 @@
 // https://www.shadertoy.com/view/3d2XRd
 
 const float root_size = 1.0;
-const int levels = 5;
+const int levels = 2;
 const int MAX_ITER = 222;
 
-int voxel_buffer[] =
-    int[](1, 1, 1, 1, 3, 1, 0, 3, 0, 2, 2, 2, 0, 2, 0, 0, 0, 0, 0, 4, 4, 0, 4,
-          0, 0, 0, 4, 0, 0, 4, 0, 4, 5, 5, 5, 0, 5, 0, 0, 0, 0, 0, 0, 0, 6, 0,
-          0, 0, 0, 7, 0, 0, 7, 0, 7, 0, -1, 0, -1, 0, 0, -1, 0, 0);
+// int voxel_buffer[] =
+//     int[](1, 1, 1, 1, 3, 1, 0, 3, 0, 2, 2, 2, 0, 2, 0, 0, 0, 0, 0, 4, 4, 0, 4,
+//           0, 0, 0, 4, 0, 0, 4, 0, 4, 5, 5, 5, 0, 5, 0, 0, 0, 0, 0, 0, 0, 6, 0,
+//           0, 0, 0, 7, 0, 0, 7, 0, 7, 0, -1, 0, -1, 0, 0, -1, 0, 0);
 
-// int voxel_buffer[] = int[](1, 0, 0, 1, 0, -1, -1, -1, 2, 0, 0, 0, 0, 0, 0, 0,
-// -1, 0,
-//                      0, 0, 0, 0, 0, -1);
+int voxel_buffer[] = int[](
+  1,1,1,1,1,1,1,0,
+  1,0,0,0,0,0,0,0);
 
 const float[6] scale_lookup = float[6](1., .5, .25, .125, .0625, .03125);
 
@@ -35,7 +35,7 @@ bool isect(out float tcmin, out float tcmax, out vec3 tmid, out vec3 tmax,
 }
 
 // returns true if hit, false if miss
-bool trace(out float tcmin, out float tcmax, out vec3 pos, out int iter,
+bool trace(out float tcmin, out float tcmax, out vec3 pos, out int iter_used,
            out float size, in vec3 rayPos, in vec3 rayDir) {
   struct ST {
     vec3 pos;
@@ -71,12 +71,12 @@ bool trace(out float tcmin, out float tcmax, out vec3 pos, out int iter,
   // move to first hitted sub-cell center
   pos += 0.5 * size * idx;
 
-  iter = MAX_ITER;
-  while (iter-- > 0) {
+  iter_used = 0;
+  while (iter_used++ < MAX_ITER) {
     // transform idx from [-1, 1] to [0, 1]
     vec3 idx01 = idx * .5 + .5;
-    float subIdx = dot(idx01, vec3(1., 2., 4.));
-    int curIdx = stackIdx * 8 + int(subIdx);
+    float local_mem_offset = dot(idx01, vec3(1., 2., 4.));
+    int curIdx = stackIdx * 8 + int(local_mem_offset);
 
     isect(tcmin, tcmax, tmid, tmax, pos, size, rayPos, rayDir);
 
@@ -181,11 +181,18 @@ void mainImage(out vec4 fragColor, in vec2 fragCoord) {
   float tcmin, tcmax;
   vec3 pos;
   float size;
-  int iter;
-  bool hit = trace(tcmin, tcmax, pos, iter, size, rayPos, rayDir);
-  vec3 col = hit ? vec3(1) : vec3(0);
+  int iter_used;
+  bool hit = trace(tcmin, tcmax, pos,iter_used, size, rayPos, rayDir);
+  
+  if(hit){
+    fragColor = vec4(vec3(float(iter_used)/float(10)),1.);
+    return;
+  }
+
+  fragColor = vec4(vec3(0),1.);
+
+  // vec3 col = hit ? vec3(1) : vec3(0);
   // vec3 col = hit ? vec3((tcmin - 6.) * .5, 0., 0.) : vec3(.0, 0., 0.);
 
   // fragColor = vec4(vec3(float(iter)/float(MAX_ITER)),1.);
-  fragColor = vec4(col, 1.0);
 }
