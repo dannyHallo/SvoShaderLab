@@ -4,13 +4,13 @@ const float root_size = 1.0;
 const int levels = 5;
 const int MAX_ITER = 222;
 
-int voxels[] =
+int voxel_buffer[] =
     int[](1, 1, 1, 1, 3, 1, 0, 3, 0, 2, 2, 2, 0, 2, 0, 0, 0, 0, 0, 4, 4, 0, 4,
           0, 0, 0, 4, 0, 0, 4, 0, 4, 5, 5, 5, 0, 5, 0, 0, 0, 0, 0, 0, 0, 6, 0,
           0, 0, 0, 7, 0, 0, 7, 0, 7, 0, -1, 0, -1, 0, 0, -1, 0, 0);
 
-// int voxels[] = int[](1, 0, 0, 1, 0, -1, -1, -1, 2, 0, 0, 0, 0, 0, 0, 0, -1,
-// 0,
+// int voxel_buffer[] = int[](1, 0, 0, 1, 0, -1, -1, -1, 2, 0, 0, 0, 0, 0, 0, 0,
+// -1, 0,
 //                      0, 0, 0, 0, 0, -1);
 
 const float[6] scale_lookup = float[6](1., .5, .25, .125, .0625, .03125);
@@ -61,7 +61,7 @@ bool trace(out float tcmin, out float tcmax, out vec3 pos, out int iter,
   }
   float h = tcmax;
 
-  // initial push
+  // initial [PUSH], determine the first hited child (direct child of root node)
   // for x component, if tcmin < tmid.x, idx.x reverts the ray dir in x axis,
   // same for y and z
   vec3 idx = mix(-sign(rayDir), sign(rayDir), step(tmid, vec3(tcmin)));
@@ -73,69 +73,60 @@ bool trace(out float tcmin, out float tcmax, out vec3 pos, out int iter,
 
   iter = MAX_ITER;
   while (iter-- > 0) {
-    float subIdx = dot(idx * .5 + .5, vec3(1., 2., 4.));
+    // transform idx from [-1, 1] to [0, 1]
+    vec3 idx01 = idx * .5 + .5;
+    float subIdx = dot(idx01, vec3(1., 2., 4.));
     int curIdx = stackIdx * 8 + int(subIdx);
 
     isect(tcmin, tcmax, tmid, tmax, pos, size, rayPos, rayDir);
 
-    // voxel exists
-    if (voxels[curIdx] != 0) {
+    // [PUSH] repeatedly, until empty voxel is found
+    // when pushed layer reached the same level as the smallest voxel, stop and
+    // return (this is temporary solution for finding the leaf)
+    if (can_push && voxel_buffer[curIdx] != 0) {
       // hits the smallest voxel
       if (scale >= levels) {
         return true;
       }
 
-      if (can_push) {
-        //-- PUSH --//
-
-        // tcmax is this voxel exist dist, h is parent voxel exist dist
-        if (tcmax < h) {
-          stack[stack_ptr++] = ST(pos, scale, idx, stackIdx, h);
-        }
-
-        h = tcmax;
-        scale++;
-        size *= 0.5;
-
-        // step: for element i of the return value, 0.0 is returned if x[i] <
-        // edge[i], and 1.0 is returned otherwise.
-        idx = mix(-sign(rayDir), sign(rayDir), step(tmid, vec3(tcmin)));
-
-        stackIdx = voxels[curIdx];
-
-        pos += 0.5 * size * idx;
-        continue;
+      // tcmax is current voxel's exist time, h is parent voxel exist time
+      if (tcmax < h) {
+        stack[stack_ptr++] = ST(pos, scale, idx, stackIdx, h);
       }
+
+      h = tcmax;
+      scale++;
+      size *= 0.5;
+
+      // step: for element i of the return value, 0.0 is returned if x[i] <
+      // edge[i], and 1.0 is returned otherwise.
+      idx = mix(-sign(rayDir), sign(rayDir), step(tmid, vec3(tcmin)));
+
+      stackIdx = voxel_buffer[curIdx];
+
+      pos += 0.5 * size * idx;
+      continue;
     }
 
-    // when code still running,means (!voxel Exist  || can_push == false)
-
-    //-- ADVANCE --//
-
-    // advance for every direction where we're hitting the middle (tmax = tmid)
+    // save the previous idx
     vec3 old = idx;
 
-    // this is genius,for the hitted direction,if hit point is in the middle,we
-    // advance to the other side, else if hit point is in the edge,it will leave
-    // the stack.and keep all unhitted direction
+    // this is genius, for the hitted direction, if hit point is in the
+    // middle, we advance to the other side, because this uses the direction
+    // directly (not increment / bit flipping), if the next bit is outside of
+    // the parent voxel, old will be equal to idx
     idx = mix(idx, sign(rayDir), equal(tmax, vec3(tcmax)));
 
-    // if old = idx → stay,else → move forward in this stack
-    pos += mix(vec3(0.), sign(rayDir), notEqual(old, idx)) * size;
-
-    // if idx hasn't changed, we're at the last child in this voxel
+    // idx has not changed -> [POP]
     if (idx == old) {
-      //-- POP --//
-
-      // exist Whole Octree;
-      if (stack_ptr == 0 || scale == 0)
+      // if poped all the way to the root
+      // if (stack_ptr == 0 || scale == 0)
+      if (stack_ptr == 0)
         return false;
 
-      ST s = stack[--stack_ptr]; // Back to parent Stack
+      ST s = stack[--stack_ptr]; // restore to parent Stack
       pos = s.pos;
       scale = s.scale;
-
-      // size = root_size * exp2(float(-scale));
       size = root_size * scale_lookup[scale];
       idx = s.idx;
       stackIdx = s.ptr;
@@ -144,8 +135,10 @@ bool trace(out float tcmin, out float tcmax, out vec3 pos, out int iter,
       // once stack pop out,get rid out pushing in again
       can_push = false;
     }
-    // idx != old  move forward in this stack
+    // idx has changed -> [ADVANCE]
     else {
+      // if old = idx → stay,else → move forward in this stack
+      pos += mix(vec3(0.), sign(rayDir), notEqual(old, idx)) * size;
       can_push = true;
     }
   }
