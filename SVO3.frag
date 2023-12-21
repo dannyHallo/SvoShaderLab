@@ -1,17 +1,24 @@
 // https://www.shadertoy.com/view/3d2XRd
 
 const float root_size = 1.0;
-const int levels = 2;
 const int MAX_ITER = 222;
+const uint kMaxLevels = 6u;
 
 // int voxel_buffer[] =
-//     int[](1, 1, 1, 1, 3, 1, 0, 3, 0, 2, 2, 2, 0, 2, 0, 0, 0, 0, 0, 4, 4, 0, 4,
-//           0, 0, 0, 4, 0, 0, 4, 0, 4, 5, 5, 5, 0, 5, 0, 0, 0, 0, 0, 0, 0, 6, 0,
-//           0, 0, 0, 7, 0, 0, 7, 0, 7, 0, -1, 0, -1, 0, 0, -1, 0, 0);
+//     int[](1, 1, 1, 1, 3, 1, 0, 3, 0, 2, 2, 2, 0, 2, 0, 0, 0, 0, 0, 4, 4, 0,
+//     4,
+//           0, 0, 0, 4, 0, 0, 4, 0, 4, 5, 5, 5, 0, 5, 0, 0, 0, 0, 0, 0, 0, 6,
+//           0, 0, 0, 0, 7, 0, 0, 7, 0, 7, 0, -1, 0, -1, 0, 0, -1, 0, 0);
 
-int voxel_buffer[] = int[](
-  1,1,1,1,1,1,1,0,
-  1,0,0,0,0,0,0,0);
+// int voxel_buffer[] = int[](
+//   1,1,1,1,1,1,1,0,
+//   1,0,0,0,0,0,0,0);
+
+// uint voxels[6] = uint[6](129526u,197373u,312318u,1791u,329726u,1023u);
+uint voxel_buffer[] = uint[](98304u, // 0000 0000 0000 0001, 1000 0000,0000 0000
+                             38655u, // 0000 0000 0000 0000, 1001 0110 1111 1111
+                             33203u  // 0000 0000 0000 0000, 1000 0000 0000 0011
+);
 
 const float[6] scale_lookup = float[6](1., .5, .25, .125, .0625, .03125);
 
@@ -34,16 +41,49 @@ bool isect(out float tcmin, out float tcmax, out vec3 tmid, out vec3 tmax,
   return tcmin <= tcmax;
 }
 
+uint countOnes(uint value, uint n) {
+    // Create a mask with 1s in the first n bits (counting from left to right)
+    uint mask = 0xFFu << (8u - n);
+
+    // Apply the mask to isolate the relevant bits
+    uint relevantBits = value & mask;
+
+    // Count the number of 1s in the relevant bits
+    // Bitwise population count (Hamming weight)
+    relevantBits = relevantBits - ((relevantBits >> 1u) & 0x55u);
+    relevantBits = (relevantBits & 0x33u) + ((relevantBits >> 2u) & 0x33u);
+    return (relevantBits + (relevantBits >> 4u)) & 0x0Fu;
+}
+
+void fetch_voxel_buffer(out uint next_byte_offset, out bool has_voxel,
+                        out bool is_leaf, uint byte_offset, uint bit_offset) {
+  uint voxel_node = voxel_buffer[byte_offset];
+  // 16: group offset
+  next_byte_offset = voxel_node >> 16;
+  // 8: child mask
+  uint voxel_child_mask = (voxel_node & 0x0000FF00u) >> 8;
+  // 8: leaf mask
+  uint voxel_leaf_mask = voxel_node & 0x000000FFu;
+
+  has_voxel = (voxel_child_mask & (1u << bit_offset)) != 0u;
+  is_leaf = (voxel_leaf_mask & (1u << bit_offset)) != 0u;
+  
+  if(has_voxel) {
+    next_byte_offset += bit_offset;
+  }
+}
+
 // returns true if hit, false if miss
 bool trace(out float tcmin, out float tcmax, out vec3 pos, out int iter_used,
            out float size, in vec3 rayPos, in vec3 rayDir) {
   struct ST {
     vec3 pos;
-    int scale; // size = root_size * exp2(float(-scale));
+    int scale; // size = root_size * exp2(float(-scale)), we used a loopup table
+               // to get the size
     vec3 idx;
-    int ptr;
+    uint ptr;
     float h;
-  } stack[levels];
+  } stack[kMaxLevels];
 
   int stack_ptr = 0;
 
@@ -65,7 +105,7 @@ bool trace(out float tcmin, out float tcmax, out vec3 pos, out int iter_used,
   // for x component, if tcmin < tmid.x, idx.x reverts the ray dir in x axis,
   // same for y and z
   vec3 idx = mix(-sign(rayDir), sign(rayDir), step(tmid, vec3(tcmin)));
-  int stackIdx = 0;
+  uint stackIdx = 0u;
   int scale = 1;
   size *= 0.5;
   // move to first hitted sub-cell center
@@ -75,17 +115,21 @@ bool trace(out float tcmin, out float tcmax, out vec3 pos, out int iter_used,
   while (iter_used++ < MAX_ITER) {
     // transform idx from [-1, 1] to [0, 1]
     vec3 idx01 = idx * .5 + .5;
-    float local_mem_offset = dot(idx01, vec3(1., 2., 4.));
-    int curIdx = stackIdx * 8 + int(local_mem_offset);
+    uint mem_offset = uint(dot(idx01, vec3(1., 2., 4.))); // 0-7
+    uint bit_mem_offset = 1u << mem_offset; // 00000001 ... 10000000
+
+    uint voxel_group_offset, voxel_child_mask, voxel_leaf_mask;
+    fetch_voxel_buffer(voxel_group_offset, voxel_child_mask, voxel_leaf_mask,
+                       stackIdx);
 
     isect(tcmin, tcmax, tmid, tmax, pos, size, rayPos, rayDir);
 
     // [PUSH] repeatedly, until empty voxel is found
     // when pushed layer reached the same level as the smallest voxel, stop and
     // return (this is temporary solution for finding the leaf)
-    if (can_push && voxel_buffer[curIdx] != 0) {
-      // hits the smallest voxel
-      if (scale >= levels) {
+    if (can_push && ((voxel_child_mask & bit_mem_offset) != 0u)) {
+      // hits the leaf
+      if ((voxel_leaf_mask & bit_mem_offset) != 0u) {
         return true;
       }
 
@@ -102,7 +146,7 @@ bool trace(out float tcmin, out float tcmax, out vec3 pos, out int iter_used,
       // edge[i], and 1.0 is returned otherwise.
       idx = mix(-sign(rayDir), sign(rayDir), step(tmid, vec3(tcmin)));
 
-      stackIdx = voxel_buffer[curIdx];
+      stackIdx = voxel_buffer[voxel_group_offset];
 
       pos += 0.5 * size * idx;
       continue;
@@ -182,14 +226,14 @@ void mainImage(out vec4 fragColor, in vec2 fragCoord) {
   vec3 pos;
   float size;
   int iter_used;
-  bool hit = trace(tcmin, tcmax, pos,iter_used, size, rayPos, rayDir);
-  
-  if(hit){
-    fragColor = vec4(vec3(float(iter_used)/float(10)),1.);
+  bool hit = trace(tcmin, tcmax, pos, iter_used, size, rayPos, rayDir);
+
+  if (hit) {
+    fragColor = vec4(vec3(float(iter_used) / float(10)), 1.);
     return;
   }
 
-  fragColor = vec4(vec3(0),1.);
+  fragColor = vec4(vec3(0), 1.);
 
   // vec3 col = hit ? vec3(1) : vec3(0);
   // vec3 col = hit ? vec3((tcmin - 6.) * .5, 0., 0.) : vec3(.0, 0., 0.);
