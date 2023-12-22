@@ -1,24 +1,15 @@
 // https://www.shadertoy.com/view/3d2XRd
 
 const float root_size = 1.0;
-const int MAX_ITER = 222;
+const int MAX_ITER = 100;
 const uint kMaxLevels = 6u;
 
-// int voxel_buffer[] =
-//     int[](1, 1, 1, 1, 3, 1, 0, 3, 0, 2, 2, 2, 0, 2, 0, 0, 0, 0, 0, 4, 4, 0,
-//     4,
-//           0, 0, 0, 4, 0, 0, 4, 0, 4, 5, 5, 5, 0, 5, 0, 0, 0, 0, 0, 0, 0, 6,
-//           0, 0, 0, 0, 7, 0, 0, 7, 0, 7, 0, -1, 0, -1, 0, 0, -1, 0, 0);
+uint voxel_buffer[] =
+    uint[](0x0001FF00u, 0x000017FFu, 0x000070FFu, 0x0000F7FFu, 0x0000F7FFu,
+           0x0000F7FFu, 0x0000F7FFu, 0x0000F7FFu, 0x0000F7FFu);
 
-// int voxel_buffer[] = int[](
-//   1,1,1,1,1,1,1,0,
-//   1,0,0,0,0,0,0,0);
-
-// uint voxels[6] = uint[6](129526u,197373u,312318u,1791u,329726u,1023u);
-uint voxel_buffer[] = uint[](98304u, // 0000 0000 0000 0001, 1000 0000,0000 0000
-                             38655u, // 0000 0000 0000 0000, 1001 0110 1111 1111
-                             33203u  // 0000 0000 0000 0000, 1000 0000 0000 0011
-);
+// uint voxel_buffer[] =
+//     uint[](0x00018100u, 0x0000FFFFu, 0x00030100u, 0x0000FFFFu);
 
 const float[6] scale_lookup = float[6](1., .5, .25, .125, .0625, .03125);
 
@@ -38,21 +29,28 @@ bool isect(out float tcmin, out float tcmax, out vec3 tmid, out vec3 tmax,
   tcmin = max(tmin.x, max(tmin.y, tmin.z));
   tcmax = min(tmax.x, min(tmax.y, tmax.z));
 
-  return tcmin <= tcmax;
+  return tcmin <= tcmax && tcmax > 0.0;
 }
 
-uint countOnes(uint value, uint n) {
-    // Create a mask with 1s in the first n bits (counting from left to right)
-    uint mask = 0xFFu << (8u - n);
+// the best method for counting digit 1s in a 32 bit uint in parallel
+// https://graphics.stanford.edu/~seander/bithacks.html#CountBitsSetParallel
+uint bitCount(uint v) {
+  const uint S[] = uint[](1u, 2u, 4u, 8u, 16u); // Magic Binary Numbers
+  const uint B[] =
+      uint[](0x55555555u, 0x33333333u, 0x0F0F0F0Fu, 0x00FF00FFu, 0x0000FFFFu);
 
-    // Apply the mask to isolate the relevant bits
-    uint relevantBits = value & mask;
+  uint c = v - ((v >> 1) & B[0]);
+  c = ((c >> S[1]) & B[1]) + (c & B[1]);
+  c = ((c >> S[2]) + c) & B[2];
+  c = ((c >> S[3]) + c) & B[3];
+  c = ((c >> S[4]) + c) & B[4];
+  return c;
+}
 
-    // Count the number of 1s in the relevant bits
-    // Bitwise population count (Hamming weight)
-    relevantBits = relevantBits - ((relevantBits >> 1u) & 0x55u);
-    relevantBits = (relevantBits & 0x33u) + ((relevantBits >> 2u) & 0x33u);
-    return (relevantBits + (relevantBits >> 4u)) & 0x0Fu;
+uint countOnesInLastN(uint value, uint n) {
+  uint mask = 0xFFu >> (8u - n);
+  uint relevantBits = value & mask;
+  return bitCount(relevantBits);
 }
 
 void fetch_voxel_buffer(out uint next_byte_offset, out bool has_voxel,
@@ -67,15 +65,23 @@ void fetch_voxel_buffer(out uint next_byte_offset, out bool has_voxel,
 
   has_voxel = (voxel_child_mask & (1u << bit_offset)) != 0u;
   is_leaf = (voxel_leaf_mask & (1u << bit_offset)) != 0u;
-  
-  if(has_voxel) {
-    next_byte_offset += bit_offset;
+
+  if (has_voxel) {
+    // bit_offset range: 0-7, so the last n range is 1-8, so we need to +1
+    // the first bit '1' indicates a delta of 0, so we need to -1
+    next_byte_offset +=
+        countOnesInLastN(voxel_child_mask, bit_offset + 1u) - 1u;
   }
 }
 
 // returns true if hit, false if miss
-bool trace(out float tcmin, out float tcmax, out vec3 pos, out int iter_used,
-           out float size, in vec3 rayPos, in vec3 rayDir) {
+vec4 trace(out bool hit, out float tcmin, out float tcmax, out vec3 pos,
+           out int iter_used, out float size, in vec3 rayPos, in vec3 rayDir) {
+  const vec4 kBlack = vec4(0.0, 0.0, 0.0, 1.0);
+  const vec4 kRed = vec4(1.0, 0.0, 0.0, 1.0);
+  const vec4 kGreen = vec4(0.0, 1.0, 0.0, 1.0);
+  const vec4 kBlue = vec4(0.0, 0.0, 1.0, 1.0);
+
   struct ST {
     vec3 pos;
     int scale; // size = root_size * exp2(float(-scale)), we used a loopup table
@@ -86,6 +92,7 @@ bool trace(out float tcmin, out float tcmax, out vec3 pos, out int iter_used,
   } stack[kMaxLevels];
 
   int stack_ptr = 0;
+  hit = false;
 
   // STEP 1: initialize
 
@@ -97,17 +104,20 @@ bool trace(out float tcmin, out float tcmax, out vec3 pos, out int iter_used,
   bool is_intersect_with_root =
       isect(tcmin, tcmax, tmid, tmax, pos, size, rayPos, rayDir);
   if (!is_intersect_with_root) {
-    return false;
+    return kBlack;
   }
+
   float h = tcmax;
 
   // initial [PUSH], determine the first hited child (direct child of root node)
   // for x component, if tcmin < tmid.x, idx.x reverts the ray dir in x axis,
   // same for y and z
   vec3 idx = mix(-sign(rayDir), sign(rayDir), step(tmid, vec3(tcmin)));
-  uint stackIdx = 0u;
+
+  uint byte_offset = 0u;
   int scale = 1;
   size *= 0.5;
+
   // move to first hitted sub-cell center
   pos += 0.5 * size * idx;
 
@@ -115,27 +125,29 @@ bool trace(out float tcmin, out float tcmax, out vec3 pos, out int iter_used,
   while (iter_used++ < MAX_ITER) {
     // transform idx from [-1, 1] to [0, 1]
     vec3 idx01 = idx * .5 + .5;
-    uint mem_offset = uint(dot(idx01, vec3(1., 2., 4.))); // 0-7
-    uint bit_mem_offset = 1u << mem_offset; // 00000001 ... 10000000
+    uint bit_offset = uint(dot(idx01, vec3(1., 2., 4.))); // 0-7
 
-    uint voxel_group_offset, voxel_child_mask, voxel_leaf_mask;
-    fetch_voxel_buffer(voxel_group_offset, voxel_child_mask, voxel_leaf_mask,
-                       stackIdx);
+    uint next_byte_offset;
+    bool has_voxel, is_leaf;
+    fetch_voxel_buffer(next_byte_offset, has_voxel, is_leaf, byte_offset,
+                       bit_offset);
 
     isect(tcmin, tcmax, tmid, tmax, pos, size, rayPos, rayDir);
 
     // [PUSH] repeatedly, until empty voxel is found
-    // when pushed layer reached the same level as the smallest voxel, stop and
-    // return (this is temporary solution for finding the leaf)
-    if (can_push && ((voxel_child_mask & bit_mem_offset) != 0u)) {
+    // when pushed layer reached the same level as the smallest voxel, stop
+    // and return (this is temporary solution for finding the leaf)
+    if (can_push && has_voxel) {
       // hits the leaf
-      if ((voxel_leaf_mask & bit_mem_offset) != 0u) {
-        return true;
+      if (is_leaf) {
+        hit = true;
+        // return vec4(vec3(exp(-tcmin)), 1.0);
+        return kGreen;
       }
 
       // tcmax is current voxel's exist time, h is parent voxel exist time
       if (tcmax < h) {
-        stack[stack_ptr++] = ST(pos, scale, idx, stackIdx, h);
+        stack[stack_ptr++] = ST(pos, scale, idx, byte_offset, h);
       }
 
       h = tcmax;
@@ -146,7 +158,7 @@ bool trace(out float tcmin, out float tcmax, out vec3 pos, out int iter_used,
       // edge[i], and 1.0 is returned otherwise.
       idx = mix(-sign(rayDir), sign(rayDir), step(tmid, vec3(tcmin)));
 
-      stackIdx = voxel_buffer[voxel_group_offset];
+      byte_offset = next_byte_offset;
 
       pos += 0.5 * size * idx;
       continue;
@@ -166,14 +178,14 @@ bool trace(out float tcmin, out float tcmax, out vec3 pos, out int iter_used,
       // if poped all the way to the root
       // if (stack_ptr == 0 || scale == 0)
       if (stack_ptr == 0)
-        return false;
+        return kBlack;
 
       ST s = stack[--stack_ptr]; // restore to parent Stack
       pos = s.pos;
       scale = s.scale;
       size = root_size * scale_lookup[scale];
       idx = s.idx;
-      stackIdx = s.ptr;
+      byte_offset = s.ptr;
       h = s.h;
 
       // once stack pop out,get rid out pushing in again
@@ -186,7 +198,7 @@ bool trace(out float tcmin, out float tcmax, out vec3 pos, out int iter_used,
       can_push = true;
     }
   }
-  return false;
+  return kBlack;
 }
 
 vec2 rotate2d(vec2 v, float a) {
@@ -207,12 +219,14 @@ void rayGen(out vec3 rayPos, out vec3 rayDir, vec2 uv) {
 
   const float kFloatingFreq = 2.0;
   const float kFloatingAmp = 0.15;
-  const float kOrbitingDist = 1.2;
-  rayPos = vec3(0.0, kFloatingAmp * sin(iTime * kFloatingFreq), kOrbitingDist);
+  const float kOrbitingDist = 2.2;
+  rayPos = vec3(0.0, kFloatingAmp * sin(iTime * kFloatingFreq), -kOrbitingDist);
 
   // rotate camera to orbit the object with time
-  rayPos.xz = rotate2d(rayPos.xz, iTime);
-  rayDir.xz = rotate2d(rayDir.xz, iTime);
+  const float kMouseSensitivity = 1e-2 * 2.0;
+  float mouseVal = -iMouse.x * kMouseSensitivity;
+  rayPos.xz = rotate2d(rayPos.xz, mouseVal);
+  rayDir.xz = rotate2d(rayDir.xz, mouseVal);
 }
 
 void mainImage(out vec4 fragColor, in vec2 fragCoord) {
@@ -223,20 +237,15 @@ void mainImage(out vec4 fragColor, in vec2 fragCoord) {
 
   // step 2: ray march
   float tcmin, tcmax;
+  bool hit;
   vec3 pos;
   float size;
   int iter_used;
-  bool hit = trace(tcmin, tcmax, pos, iter_used, size, rayPos, rayDir);
+  fragColor = trace(hit, tcmin, tcmax, pos, iter_used, size, rayPos, rayDir);
 
+  // customized shading
   if (hit) {
-    fragColor = vec4(vec3(float(iter_used) / float(10)), 1.);
-    return;
+    // fragColor = vec4(vec3(float(iter_used) / 10.0), 1.0);
+    fragColor = vec4(vec3(exp(-tcmin)), 1.0);
   }
-
-  fragColor = vec4(vec3(0), 1.);
-
-  // vec3 col = hit ? vec3(1) : vec3(0);
-  // vec3 col = hit ? vec3((tcmin - 6.) * .5, 0., 0.) : vec3(.0, 0., 0.);
-
-  // fragColor = vec4(vec3(float(iter)/float(MAX_ITER)),1.);
 }
