@@ -15,7 +15,7 @@ uint32_t _combine8To1(ImageData const *_lowerLevelData, Coor3D const &coorCur) {
         Coor3D coorLowerLevel = {coorCur.x * 2 + x, coorCur.y * 2 + y, coorCur.z * 2 + z};
         uint32_t dataRead     = _lowerLevelData->imageLoad(coorLowerLevel);
         if (dataRead & 0x0000FF00) {
-          dataWrite |= 0x00000001 << (x * 4 + y * 2 + z);
+          dataWrite |= 0x00000001 << (x * 4 + y * 2 + z + 8);
         }
       }
     }
@@ -28,7 +28,7 @@ uint32_t _combine8To1(ImageData const *_lowerLevelData, Coor3D const &coorCur) {
 void build(ImageData const *lowerLevelData, ImageData *thisLevelData) {
   Coor3D coorCur{0, 0, 0};
 
-  Coor3D _lowerLevelImageSize = lowerLevelData->imageSize();
+  Coor3D _lowerLevelImageSize = lowerLevelData->getImageSize();
 
   for (int x = 0; x < _lowerLevelImageSize.x / 2; x++) {
     coorCur.x = x;
@@ -38,7 +38,10 @@ void build(ImageData const *lowerLevelData, ImageData *thisLevelData) {
         coorCur.z = z;
 
         uint32_t dataWrite = _combine8To1(lowerLevelData, coorCur);
-        thisLevelData->imageStore(coorCur, dataWrite);
+        // if dataWrite is 0, we don't need to store it, because it means all leaf nodes are 0
+        if (dataWrite) {
+          thisLevelData->imageStore(coorCur, dataWrite);
+        }
       }
     }
   }

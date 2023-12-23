@@ -4,7 +4,6 @@
 
 void ImageData::imageStore(Coor3D const &coor, uint32_t val) {
   assert(_isInBound(coor) && "ImageData::imageStore: out of bound");
-
   _imageData[coor] = val;
 }
 
