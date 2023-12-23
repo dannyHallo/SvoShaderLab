@@ -1,30 +1,31 @@
 // https://www.shadertoy.com/view/3d2XRd
 
 const float root_size = 1.0;
-const int MAX_ITER = 100;
+const int MAX_ITER    = 100;
 const uint kMaxLevels = 6u;
 
-uint voxel_buffer[] =
-    uint[](0x0001FF00u, 0x000017FFu, 0x000070FFu, 0x0000F7FFu, 0x0000F7FFu,
-           0x0000F7FFu, 0x0000F7FFu, 0x0000F7FFu, 0x0000F7FFu);
+// uint voxel_buffer[] = uint[](0x0001FF00u, 0x000017FFu, 0x000070FFu, 0x0000F7FFu, 0x0000F7FFu,
+//                              0x0000F7FFu, 0x0000F7FFu, 0x0000F7FFu, 0x0000F7FFu);
 
-// uint voxel_buffer[] =
-//     uint[](0x00018100u, 0x0000FFFFu, 0x00030100u, 0x0000FFFFu);
+uint voxel_buffer[] = uint[](
+    0x0001CC00u, 0x00053300u, 0x00093300u, 0x000D3300u, 0x00113300u, 0x0015FFFFu, 0x001DFFFFu,
+    0x0025FFFFu, 0x002DFFFFu, 0x0035FFFFu, 0x003DFFFFu, 0x0045FFFFu, 0x004DFFFFu, 0x0055FFFFu,
+    0x005DFFFFu, 0x0065FFFFu, 0x006DFFFFu, 0x0075FFFFu, 0x007DFFFFu, 0x0085FFFFu, 0x008DFFFFu);
 
 const float[6] scale_lookup = float[6](1., .5, .25, .125, .0625, .03125);
 
 // returns t0 and t1, also fills tmid and tmax
-bool isect(out float tcmin, out float tcmax, out vec3 tmid, out vec3 tmax,
-           vec3 pos, float size, vec3 rayPos, vec3 rayDir) {
-  vec3 minCorner = pos - 0.5 * size;
+bool isect(out float tcmin, out float tcmax, out vec3 tmid, out vec3 tmax, vec3 pos, float size,
+           vec3 rayPos, vec3 rayDir) {
+vec3 minCorner = pos - 0.5 * size;
   vec3 maxCorner = pos + 0.5 * size;
   // xyz components of t for the ray to get to the 3 planes of minCorner
   vec3 t1 = (minCorner - rayPos) / rayDir;
   // xyz ...
-  vec3 t2 = (maxCorner - rayPos) / rayDir;
+  vec3 t2   = (maxCorner - rayPos) / rayDir;
   vec3 tmin = min(t1, t2);
-  tmax = max(t1, t2);
-  tmid = (tmin + tmax) * 0.5;
+  tmax      = max(t1, t2);
+  tmid      = (tmin + tmax) * 0.5;
 
   tcmin = max(tmin.x, max(tmin.y, tmin.z));
   tcmax = min(tmax.x, min(tmax.y, tmax.z));
@@ -36,25 +37,24 @@ bool isect(out float tcmin, out float tcmax, out vec3 tmid, out vec3 tmax,
 // https://graphics.stanford.edu/~seander/bithacks.html#CountBitsSetParallel
 uint bitCount(uint v) {
   const uint S[] = uint[](1u, 2u, 4u, 8u, 16u); // Magic Binary Numbers
-  const uint B[] =
-      uint[](0x55555555u, 0x33333333u, 0x0F0F0F0Fu, 0x00FF00FFu, 0x0000FFFFu);
+  const uint B[] = uint[](0x55555555u, 0x33333333u, 0x0F0F0F0Fu, 0x00FF00FFu, 0x0000FFFFu);
 
   uint c = v - ((v >> 1) & B[0]);
-  c = ((c >> S[1]) & B[1]) + (c & B[1]);
-  c = ((c >> S[2]) + c) & B[2];
-  c = ((c >> S[3]) + c) & B[3];
-  c = ((c >> S[4]) + c) & B[4];
+  c      = ((c >> S[1]) & B[1]) + (c & B[1]);
+  c      = ((c >> S[2]) + c) & B[2];
+  c      = ((c >> S[3]) + c) & B[3];
+  c      = ((c >> S[4]) + c) & B[4];
   return c;
 }
 
 uint countOnesInLastN(uint value, uint n) {
-  uint mask = 0xFFu >> (8u - n);
+  uint mask         = 0xFFu >> (8u - n);
   uint relevantBits = value & mask;
   return bitCount(relevantBits);
 }
 
-void fetch_voxel_buffer(out uint next_byte_offset, out bool has_voxel,
-                        out bool is_leaf, uint byte_offset, uint bit_offset) {
+void fetch_voxel_buffer(out uint next_byte_offset, out bool has_voxel, out bool is_leaf,
+                        uint byte_offset, uint bit_offset) {
   uint voxel_node = voxel_buffer[byte_offset];
   // 16: group offset
   next_byte_offset = voxel_node >> 16;
@@ -64,23 +64,22 @@ void fetch_voxel_buffer(out uint next_byte_offset, out bool has_voxel,
   uint voxel_leaf_mask = voxel_node & 0x000000FFu;
 
   has_voxel = (voxel_child_mask & (1u << bit_offset)) != 0u;
-  is_leaf = (voxel_leaf_mask & (1u << bit_offset)) != 0u;
+  is_leaf   = (voxel_leaf_mask & (1u << bit_offset)) != 0u;
 
   if (has_voxel) {
     // bit_offset range: 0-7, so the last n range is 1-8, so we need to +1
     // the first bit '1' indicates a delta of 0, so we need to -1
-    next_byte_offset +=
-        countOnesInLastN(voxel_child_mask, bit_offset + 1u) - 1u;
+    next_byte_offset += countOnesInLastN(voxel_child_mask, bit_offset + 1u) - 1u;
   }
 }
 
 // returns true if hit, false if miss
-vec4 trace(out bool hit, out float tcmin, out float tcmax, out vec3 pos,
-           out int iter_used, out float size, in vec3 rayPos, in vec3 rayDir) {
+vec4 trace(out bool hit, out float tcmin, out float tcmax, out vec3 pos, out int iter_used,
+           out float size, in vec3 rayPos, in vec3 rayDir) {
   const vec4 kBlack = vec4(0.0, 0.0, 0.0, 1.0);
-  const vec4 kRed = vec4(1.0, 0.0, 0.0, 1.0);
+  const vec4 kRed   = vec4(1.0, 0.0, 0.0, 1.0);
   const vec4 kGreen = vec4(0.0, 1.0, 0.0, 1.0);
-  const vec4 kBlue = vec4(0.0, 0.0, 1.0, 1.0);
+  const vec4 kBlue  = vec4(0.0, 0.0, 1.0, 1.0);
 
   struct ST {
     vec3 pos;
@@ -92,17 +91,16 @@ vec4 trace(out bool hit, out float tcmin, out float tcmax, out vec3 pos,
   } stack[kMaxLevels];
 
   int stack_ptr = 0;
-  hit = false;
+  hit           = false;
 
   // STEP 1: initialize
 
-  size = root_size;
+  size          = root_size;
   vec3 root_pos = vec3(0);
-  pos = root_pos;
+  pos           = root_pos;
   vec3 tmid, tmax;
-  bool can_push = true;
-  bool is_intersect_with_root =
-      isect(tcmin, tcmax, tmid, tmax, pos, size, rayPos, rayDir);
+  bool can_push               = true;
+  bool is_intersect_with_root = isect(tcmin, tcmax, tmid, tmax, pos, size, rayPos, rayDir);
   if (!is_intersect_with_root) {
     return kBlack;
   }
@@ -115,7 +113,7 @@ vec4 trace(out bool hit, out float tcmin, out float tcmax, out vec3 pos,
   vec3 idx = mix(-sign(rayDir), sign(rayDir), step(tmid, vec3(tcmin)));
 
   uint byte_offset = 0u;
-  int scale = 1;
+  int scale        = 1;
   size *= 0.5;
 
   // move to first hitted sub-cell center
@@ -124,13 +122,12 @@ vec4 trace(out bool hit, out float tcmin, out float tcmax, out vec3 pos,
   iter_used = 0;
   while (iter_used++ < MAX_ITER) {
     // transform idx from [-1, 1] to [0, 1]
-    vec3 idx01 = idx * .5 + .5;
+    vec3 idx01      = idx * .5 + .5;
     uint bit_offset = uint(dot(idx01, vec3(1., 2., 4.))); // 0-7
 
     uint next_byte_offset;
     bool has_voxel, is_leaf;
-    fetch_voxel_buffer(next_byte_offset, has_voxel, is_leaf, byte_offset,
-                       bit_offset);
+    fetch_voxel_buffer(next_byte_offset, has_voxel, is_leaf, byte_offset, bit_offset);
 
     isect(tcmin, tcmax, tmid, tmax, pos, size, rayPos, rayDir);
 
@@ -177,16 +174,15 @@ vec4 trace(out bool hit, out float tcmin, out float tcmax, out vec3 pos,
     if (idx == old) {
       // if poped all the way to the root
       // if (stack_ptr == 0 || scale == 0)
-      if (stack_ptr == 0)
-        return kBlack;
+      if (stack_ptr == 0) return kBlack;
 
-      ST s = stack[--stack_ptr]; // restore to parent Stack
-      pos = s.pos;
-      scale = s.scale;
-      size = root_size * scale_lookup[scale];
-      idx = s.idx;
+      ST s        = stack[--stack_ptr]; // restore to parent Stack
+      pos         = s.pos;
+      scale       = s.scale;
+      size        = root_size * scale_lookup[scale];
+      idx         = s.idx;
       byte_offset = s.ptr;
-      h = s.h;
+      h           = s.h;
 
       // once stack pop out,get rid out pushing in again
       can_push = false;
@@ -211,22 +207,22 @@ void rayGen(out vec3 rayPos, out vec3 rayDir, vec2 uv) {
   // [-1, 1] in both axis
   vec2 screenPos = uv * 2.0 - 1.0;
 
-  vec3 cameraDir = vec3(0.0, 0.0, 1.0);
+  vec3 cameraDir    = vec3(0.0, 0.0, 1.0);
   vec3 cameraPlaneU = vec3(1.0, 0.0, 0.0);
   vec3 cameraPlaneV = vec3(0.0, 1.0, 0.0) * iResolution.y / iResolution.x;
 
   rayDir = cameraDir + screenPos.x * cameraPlaneU + screenPos.y * cameraPlaneV;
 
   const float kFloatingFreq = 2.0;
-  const float kFloatingAmp = 0.15;
+  const float kFloatingAmp  = 0.15;
   const float kOrbitingDist = 2.2;
-  rayPos = vec3(0.0, kFloatingAmp * sin(iTime * kFloatingFreq), -kOrbitingDist);
+  rayPos                    = vec3(0.0, kFloatingAmp * sin(iTime * kFloatingFreq), -kOrbitingDist);
 
   // rotate camera to orbit the object with time
   const float kMouseSensitivity = 1e-2 * 2.0;
-  float mouseVal = -iMouse.x * kMouseSensitivity;
-  rayPos.xz = rotate2d(rayPos.xz, mouseVal);
-  rayDir.xz = rotate2d(rayDir.xz, mouseVal);
+  float mouseVal                = -iMouse.x * kMouseSensitivity;
+  rayPos.xz                     = rotate2d(rayPos.xz, mouseVal);
+  rayDir.xz                     = rotate2d(rayDir.xz, mouseVal);
 }
 
 void mainImage(out vec4 fragColor, in vec2 fragCoord) {
