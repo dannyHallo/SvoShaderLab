@@ -4,20 +4,21 @@ const float root_size = 1.0;
 const int MAX_ITER    = 100;
 const uint kMaxLevels = 6u;
 
-// uint voxel_buffer[] = uint[](0x0001FF00u, 0x000017FFu, 0x000070FFu, 0x0000F7FFu, 0x0000F7FFu,
-//                              0x0000F7FFu, 0x0000F7FFu, 0x0000F7FFu, 0x0000F7FFu);
-
 uint voxel_buffer[] = uint[](
-    0x0001CC00u, 0x00053300u, 0x00093300u, 0x000D3300u, 0x00113300u, 0x0015FFFFu, 0x001DFFFFu,
-    0x0025FFFFu, 0x002DFFFFu, 0x0035FFFFu, 0x003DFFFFu, 0x0045FFFFu, 0x004DFFFFu, 0x0055FFFFu,
-    0x005DFFFFu, 0x0065FFFFu, 0x006DFFFFu, 0x0075FFFFu, 0x007DFFFFu, 0x0085FFFFu, 0x008DFFFFu);
+    0x00018100u, 0x00030700u, 0x00068000u, 0x0007FFFFu, 0x000FFFFFu, 0x0017FFFFu, 0x001FFFFFu, 0x0027FFFFu);
 
 const float[6] scale_lookup = float[6](1., .5, .25, .125, .0625, .03125);
 
 // returns t0 and t1, also fills tmid and tmax
-bool isect(out float tcmin, out float tcmax, out vec3 tmid, out vec3 tmax, vec3 pos, float size,
-           vec3 rayPos, vec3 rayDir) {
-vec3 minCorner = pos - 0.5 * size;
+bool isect(out float tcmin,
+           out float tcmax,
+           out vec3 tmid,
+           out vec3 tmax,
+           vec3 pos,
+           float size,
+           vec3 rayPos,
+           vec3 rayDir) {
+  vec3 minCorner = pos - 0.5 * size;
   vec3 maxCorner = pos + 0.5 * size;
   // xyz components of t for the ray to get to the 3 planes of minCorner
   vec3 t1 = (minCorner - rayPos) / rayDir;
@@ -53,8 +54,11 @@ uint countOnesInLastN(uint value, uint n) {
   return bitCount(relevantBits);
 }
 
-void fetch_voxel_buffer(out uint next_byte_offset, out bool has_voxel, out bool is_leaf,
-                        uint byte_offset, uint bit_offset) {
+void fetch_voxel_buffer(out uint next_byte_offset,
+                        out bool has_voxel,
+                        out bool is_leaf,
+                        uint byte_offset,
+                        uint bit_offset) {
   uint voxel_node = voxel_buffer[byte_offset];
   // 16: group offset
   next_byte_offset = voxel_node >> 16;
@@ -74,14 +78,21 @@ void fetch_voxel_buffer(out uint next_byte_offset, out bool has_voxel, out bool 
 }
 
 // returns true if hit, false if miss
-vec4 trace(out bool hit, out float tcmin, out float tcmax, out vec3 pos, out int iter_used,
-           out float size, in vec3 rayPos, in vec3 rayDir) {
+vec4 trace(out bool hit,
+           out float tcmin,
+           out float tcmax,
+           out vec3 pos,
+           out int iter_used,
+           out float size,
+           in vec3 rayPos,
+           in vec3 rayDir) {
   const vec4 kBlack = vec4(0.0, 0.0, 0.0, 1.0);
   const vec4 kRed   = vec4(1.0, 0.0, 0.0, 1.0);
   const vec4 kGreen = vec4(0.0, 1.0, 0.0, 1.0);
   const vec4 kBlue  = vec4(0.0, 0.0, 1.0, 1.0);
 
-  struct ST {
+  struct ST
+  {
     vec3 pos;
     int scale; // size = root_size * exp2(float(-scale)), we used a loopup table
                // to get the size
@@ -174,7 +185,8 @@ vec4 trace(out bool hit, out float tcmin, out float tcmax, out vec3 pos, out int
     if (idx == old) {
       // if poped all the way to the root
       // if (stack_ptr == 0 || scale == 0)
-      if (stack_ptr == 0) return kBlack;
+      if (stack_ptr == 0)
+        return kBlack;
 
       ST s        = stack[--stack_ptr]; // restore to parent Stack
       pos         = s.pos;

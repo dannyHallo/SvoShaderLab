@@ -8,7 +8,8 @@
 #include <memory>
 #include <vector>
 
-class Application {
+class Application
+{
 public:
   Application();
   ~Application();
