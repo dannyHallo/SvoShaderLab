@@ -3,7 +3,12 @@ Language: Cpp
 BasedOnStyle: LLVM
 AlignConsecutiveAssignments: Consecutive
 ColumnLimit: 100
-AllowShortIfStatementsOnASingleLine: true
-AllowShortLoopsOnASingleLine: true
+BinPackArguments: false
+BinPackParameters: false
+BreakBeforeBraces: Custom
+BraceWrapping:
+  AfterFunction: false
+  AfterClass: true
+  AfterStruct: true
 ---
 
