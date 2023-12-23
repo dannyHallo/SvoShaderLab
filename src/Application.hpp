@@ -15,8 +15,11 @@ public:
   void run();
 
 private:
+  std::vector<uint32_t> _buffer;
   std::vector<std::unique_ptr<ImageData>> _imageDatas;
 
   void _buildImageDatas();
-  void _debug();
+  void _printImageDatas();
+  void _createBuffer();
+  void _printBuffer();
 };
