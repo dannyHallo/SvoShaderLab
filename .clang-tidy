@@ -1,0 +1,33 @@
+---
+Checks: "
+-*,
+bugprone-*,
+-bugprone-easily-swappable-parameters,
+
+performance-*,
+readability-*,
+
+misc-*,
+-misc-non-private-member-variables-in-classes,
+
+modernize-*,
+-modernize-use-trailing-return-type,
+-modernize-avoid-c-arrays,
+
+cppcoreguidelines-*,
+-cppcoreguidelines-pro-type-vararg,
+-cppcoreguidelines-avoid-non-const-global-variables,
+-cppcoreguidelines-non-private-member-variables-in-classes,
+-cppcoreguidelines-avoid-c-arrays,
+-cppcoreguidelines-pro-bounds-pointer-arithmetic,
+-cppcoreguidelines-prefer-member-initializer,
+
+-readability-identifier-length,
+"
+
+WarningsAsErrors: ""
+HeaderFilterRegex: ""
+FormatStyle: llvm
+CheckOptions:
+---
+
