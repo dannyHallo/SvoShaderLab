@@ -4,16 +4,8 @@ const float root_size = 1.0;
 const int MAX_ITER    = 100;
 const uint kMaxLevels = 6u;
 
-// {0, 0, 7},
-// {3, 0, 3},
-// uint voxel_buffer[] = uint[](
-//     0x00010300u, 0x00032000u, 0x00040200u, 0x00050200u, 0x00062000u, 0x0007FFFFu, 0x000FFFFFu);
-
-// {0, 0, 7},
-// uint voxel_buffer[] = uint[](0x00010200u, 0x00020200u, 0x00030200u, 0x0004FFFFu);
-
-// {3, 0, 3},
-uint voxel_buffer[] = uint[](0x00010100u, 0x00022000u, 0x00032000u, 0x0004FFFFu);
+uint voxel_buffer[] =
+    uint[](0x00010300u, 0x00032000u, 0x00040200u, 0x00052000u, 0x00060200u, 0x0007FFFFu, 0x000FFFFFu);
 
 const float[6] scale_lookup = float[6](1., .5, .25, .125, .0625, .03125);
 

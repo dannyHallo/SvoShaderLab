@@ -98,24 +98,59 @@ void Application::_printImageDatas() {
 }
 
 void Application::_createBuffer() {
-  int imIdx = static_cast<int>(_imageDatas.size()); // start with the root image
+  int imIdx = static_cast<int>(_imageDatas.size() - 1); // start with the root image
 
   int accum = 1;
 
+  std::vector<Coor3D> activeCoorsPrev{};
+
+  // process the root node
+  auto const &imageData = _imageDatas[imIdx];
+
+  auto const coor      = Coor3D{0, 0, 0};
+  uint32_t const &data = imageData->imageLoad(coor);
+  if (!data) {
+    return;
+  }
+  activeCoorsPrev.push_back(coor);
+
+  // change the data by filling the first 16 bits with the next bit offset
+  uint32_t dataToUse = data | (accum << 16);
+  _buffer.push_back(dataToUse);
+  accum += bitCount(data & 0x0000FF00); // accum the bit offset
+
+  // debug
+  std::cout << "coor: " << coor.x << " " << coor.y << " " << coor.z << std::endl;
+  std::cout << "data: " << std::hex << data << std::endl;
+
   while (--imIdx >= 0) {
-    for (auto const &[coor, data] : _imageDatas[imIdx]->getImageData()) {
-      std::cout << std::dec << "processing coor: " << coor.x << " " << coor.y << " " << coor.z
-                << std::endl;
+    auto const &imageData = _imageDatas[imIdx];
+    std::vector<Coor3D> thisTimeActiveCoors{};
+    for (auto const activeCoor : activeCoorsPrev) {
+      auto const remappedOrigin = activeCoor * 2;
+      for (int x = 0; x < 2; x++) {
+        for (int y = 0; y < 2; y++) {
+          for (int z = 0; z < 2; z++) {
+            auto const coor      = remappedOrigin + Coor3D{x, y, z};
+            uint32_t const &data = imageData->imageLoad(coor);
+            if (!data) {
+              continue;
+            }
+            thisTimeActiveCoors.push_back(coor);
 
-      // change the data by filling the first 16 bits with the next bit offset
-      uint32_t dataToUse = data | (accum << 16);
-      std::cout << std::dec << "accum: " << accum << std::endl;
+            // change the data by filling the first 16 bits with the next bit offset
+            uint32_t dataToUse = data | (accum << 16);
+            _buffer.push_back(dataToUse);
+            accum += bitCount(data & 0x0000FF00); // accum the bit offset
 
-      _buffer.push_back(dataToUse);
-      accum += bitCount(data & 0x0000FF00); // accum the bit offset
-
-      std::cout << "dataToUse: " << std::hex << dataToUse << "\n" << std::endl;
+            // debug
+            std::cout << "coor: " << coor.x << " " << coor.y << " " << coor.z << std::endl;
+            std::cout << "data: " << std::hex << data << std::endl;
+          }
+        }
+      }
     }
+    activeCoorsPrev = thisTimeActiveCoors;
   }
 }
 
