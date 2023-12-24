@@ -40,49 +40,42 @@ void _printHexFormat(const std::vector<uint32_t> &vec) {
 
 } // namespace
 
-Application::Application() {
-  std::cout << "Application constructor" << std::endl;
-  run();
-}
-
-Application::~Application() { std::cout << "Application destructor" << std::endl; }
+Application::Application() { run(); }
 
 void Application::run() {
-  std::cout << "Application::run()" << std::endl;
-
   _buildImageDatas();
 
-  std::cout << "-------------------" << std::endl;
+  std::cout << "\n-------------------\n" << std::endl;
 
   _printImageDatas();
 
-  std::cout << "-------------------" << std::endl;
+  std::cout << "\n-------------------\n" << std::endl;
 
   _createBuffer();
 
-  std::cout << "-------------------" << std::endl;
+  std::cout << "\n-------------------\n" << std::endl;
 
   _printBuffer();
 }
 
 void Application::_buildImageDatas() {
-  Coor3D const baseImageSize   = {4, 4, 4};
-  Coor3D const targetImageSize = {1, 1, 1};
+  Coor3D const kBaseImageSize = {8, 8, 8};
+  Coor3D const kRootImageSize = {1, 1, 1};
 
   // assert all components in the size should be a power of 2
   // https://stackoverflow.com/questions/1053582/how-does-this-bitwise-operation-check-for-a-power-of-2
-  assert((baseImageSize.x & (baseImageSize.x - 1)) == 0);
-  assert((baseImageSize.y & (baseImageSize.y - 1)) == 0);
-  assert((baseImageSize.z & (baseImageSize.z - 1)) == 0);
+  assert((kBaseImageSize.x & (kBaseImageSize.x - 1)) == 0);
+  assert((kBaseImageSize.y & (kBaseImageSize.y - 1)) == 0);
+  assert((kBaseImageSize.z & (kBaseImageSize.z - 1)) == 0);
 
   // create the base iamge data
-  auto imageData = std::make_unique<ImageData>(baseImageSize);
+  auto imageData = std::make_unique<ImageData>(kBaseImageSize);
   _imageDatas.push_back(std::move(imageData));
 
   int imIdx = 0;
-  BaseLevelBuilder::build(_imageDatas[imIdx].get(), baseImageSize);
+  BaseLevelBuilder::build(_imageDatas[imIdx].get(), kBaseImageSize);
 
-  while (_imageDatas[imIdx]->getImageSize() != targetImageSize) {
+  while (_imageDatas[imIdx]->getImageSize() != kRootImageSize) {
     std::cout << "imIdx: " << imIdx << std::endl;
     auto newImageData = std::make_unique<ImageData>(_imageDatas[imIdx]->getImageSize() / 2);
     _imageDatas.push_back(std::move(newImageData));
@@ -92,10 +85,11 @@ void Application::_buildImageDatas() {
 }
 
 void Application::_printImageDatas() {
-  std::cout << "Application::_debug()" << std::endl;
   for (auto const &imageData : _imageDatas) {
     std::cout << "imageData->getImageSize(): " << imageData->getImageSize().x << " "
               << imageData->getImageSize().y << " " << imageData->getImageSize().z << std::endl;
+
+    std::cout << "notice that the order is irrelevant" << std::endl;
     for (auto const &[coor, data] : imageData->getImageData()) {
       std::cout << "coor: " << coor.x << " " << coor.y << " " << coor.z << std::endl;
       std::cout << "data: " << std::hex << data << std::endl;
@@ -120,12 +114,12 @@ void Application::_createBuffer() {
       _buffer.push_back(dataToUse);
       accum += bitCount(data & 0x0000FF00); // accum the bit offset
 
-      std::cout << "dataToUse: " << std::hex << dataToUse << std::endl;
+      std::cout << "dataToUse: " << std::hex << dataToUse << "\n" << std::endl;
     }
   }
 }
 
 void Application::_printBuffer() {
-  std::cout << "Application::_printBuffer()" << std::endl;
+  std::cout << "the buffer is: \n" << std::endl;
   _printHexFormat(_buffer);
 }

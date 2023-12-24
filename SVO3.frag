@@ -4,8 +4,16 @@ const float root_size = 1.0;
 const int MAX_ITER    = 100;
 const uint kMaxLevels = 6u;
 
-uint voxel_buffer[] = uint[](
-    0x00018100u, 0x00030700u, 0x00068000u, 0x0007FFFFu, 0x000FFFFFu, 0x0017FFFFu, 0x001FFFFFu, 0x0027FFFFu);
+// {0, 0, 7},
+// {3, 0, 3},
+// uint voxel_buffer[] = uint[](
+//     0x00010300u, 0x00032000u, 0x00040200u, 0x00050200u, 0x00062000u, 0x0007FFFFu, 0x000FFFFFu);
+
+// {0, 0, 7},
+// uint voxel_buffer[] = uint[](0x00010200u, 0x00020200u, 0x00030200u, 0x0004FFFFu);
+
+// {3, 0, 3},
+uint voxel_buffer[] = uint[](0x00010100u, 0x00022000u, 0x00032000u, 0x0004FFFFu);
 
 const float[6] scale_lookup = float[6](1., .5, .25, .125, .0625, .03125);
 
@@ -90,6 +98,7 @@ vec4 trace(out bool hit,
   const vec4 kRed   = vec4(1.0, 0.0, 0.0, 1.0);
   const vec4 kGreen = vec4(0.0, 1.0, 0.0, 1.0);
   const vec4 kBlue  = vec4(0.0, 0.0, 1.0, 1.0);
+  const vec4 kGray  = vec4(0.5, 0.5, 0.5, 1.0);
 
   struct ST
   {
@@ -186,7 +195,7 @@ vec4 trace(out bool hit,
       // if poped all the way to the root
       // if (stack_ptr == 0 || scale == 0)
       if (stack_ptr == 0)
-        return kBlack;
+        return kGray;
 
       ST s        = stack[--stack_ptr]; // restore to parent Stack
       pos         = s.pos;
