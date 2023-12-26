@@ -1,180 +1,48 @@
 // https://www.shadertoy.com/view/3d2XRd
 
-const float root_size = 1.0;
 const int MAX_ITER    = 100;
-const uint kMaxLevels = 6u;
+const uint kMaxLevels = 10u;
 
-uint voxel_buffer[] = uint[](0x0001FF00u,
-                             0x00093300u,
-                             0x000D3300u,
-                             0x0011CC00u,
-                             0x0015CC00u,
-                             0x00193300u,
-                             0x001D3300u,
-                             0x0021CC00u,
-                             0x0025CC00u,
-                             0x00293300u,
-                             0x002D3300u,
-                             0x00313300u,
-                             0x00353300u,
-                             0x00393300u,
-                             0x003D3300u,
-                             0x00413300u,
-                             0x00453300u,
-                             0x0049CC00u,
-                             0x004DCC00u,
-                             0x0051CC00u,
-                             0x0055CC00u,
-                             0x0059CC00u,
-                             0x005DCC00u,
-                             0x0061CC00u,
-                             0x0065CC00u,
-                             0x00693300u,
-                             0x006D3300u,
-                             0x00713300u,
-                             0x00753300u,
-                             0x00793300u,
-                             0x007D3300u,
-                             0x00813300u,
-                             0x00853300u,
-                             0x0089CC00u,
-                             0x008DCC00u,
-                             0x0091CC00u,
-                             0x0095CC00u,
-                             0x0099CC00u,
-                             0x009DCC00u,
-                             0x00A1CC00u,
-                             0x00A5CC00u,
-                             0x00A901FFu,
-                             0x00AA01FFu,
-                             0x00AB01FFu,
-                             0x00AC01FFu,
-                             0x00AD01FFu,
-                             0x00AE01FFu,
-                             0x00AF01FFu,
-                             0x00B001FFu,
-                             0x00B101FFu,
-                             0x00B201FFu,
-                             0x00B301FFu,
-                             0x00B401FFu,
-                             0x00B501FFu,
-                             0x00B601FFu,
-                             0x00B701FFu,
-                             0x00B801FFu,
-                             0x00B901FFu,
-                             0x00BA01FFu,
-                             0x00BB01FFu,
-                             0x00BC01FFu,
-                             0x00BD01FFu,
-                             0x00BE01FFu,
-                             0x00BF01FFu,
-                             0x00C001FFu,
-                             0x00C101FFu,
-                             0x00C201FFu,
-                             0x00C301FFu,
-                             0x00C401FFu,
-                             0x00C501FFu,
-                             0x00C601FFu,
-                             0x00C701FFu,
-                             0x00C801FFu,
-                             0x00C901FFu,
-                             0x00CA01FFu,
-                             0x00CB01FFu,
-                             0x00CC01FFu,
-                             0x00CD01FFu,
-                             0x00CE01FFu,
-                             0x00CF01FFu,
-                             0x00D001FFu,
-                             0x00D101FFu,
-                             0x00D201FFu,
-                             0x00D301FFu,
-                             0x00D401FFu,
-                             0x00D501FFu,
-                             0x00D601FFu,
-                             0x00D701FFu,
-                             0x00D801FFu,
-                             0x00D901FFu,
-                             0x00DA01FFu,
-                             0x00DB01FFu,
-                             0x00DC01FFu,
-                             0x00DD01FFu,
-                             0x00DE01FFu,
-                             0x00DF01FFu,
-                             0x00E001FFu,
-                             0x00E101FFu,
-                             0x00E201FFu,
-                             0x00E301FFu,
-                             0x00E401FFu,
-                             0x00E501FFu,
-                             0x00E601FFu,
-                             0x00E701FFu,
-                             0x00E801FFu,
-                             0x00E901FFu,
-                             0x00EA01FFu,
-                             0x00EB01FFu,
-                             0x00EC01FFu,
-                             0x00ED01FFu,
-                             0x00EE01FFu,
-                             0x00EF01FFu,
-                             0x00F001FFu,
-                             0x00F101FFu,
-                             0x00F201FFu,
-                             0x00F301FFu,
-                             0x00F401FFu,
-                             0x00F501FFu,
-                             0x00F601FFu,
-                             0x00F701FFu,
-                             0x00F801FFu,
-                             0x00F901FFu,
-                             0x00FA01FFu,
-                             0x00FB01FFu,
-                             0x00FC01FFu,
-                             0x00FD01FFu,
-                             0x00FE01FFu,
-                             0x00FF01FFu,
-                             0x010001FFu,
-                             0x010101FFu,
-                             0x010201FFu,
-                             0x010301FFu,
-                             0x010401FFu,
-                             0x010501FFu,
-                             0x010601FFu,
-                             0x010701FFu,
-                             0x010801FFu,
-                             0x010901FFu,
-                             0x010A01FFu,
-                             0x010B01FFu,
-                             0x010C01FFu,
-                             0x010D01FFu,
-                             0x010E01FFu,
-                             0x010F01FFu,
-                             0x011001FFu,
-                             0x011101FFu,
-                             0x011201FFu,
-                             0x011301FFu,
-                             0x011401FFu,
-                             0x011501FFu,
-                             0x011601FFu,
-                             0x011701FFu,
-                             0x011801FFu,
-                             0x011901FFu,
-                             0x011A01FFu,
-                             0x011B01FFu,
-                             0x011C01FFu,
-                             0x011D01FFu,
-                             0x011E01FFu,
-                             0x011F01FFu,
-                             0x012001FFu,
-                             0x012101FFu,
-                             0x012201FFu,
-                             0x012301FFu,
-                             0x012401FFu,
-                             0x012501FFu,
-                             0x012601FFu,
-                             0x012701FFu,
-                             0x012801FFu);
+const uint voxel_buffer[] = uint[](0x00010100u,
+                                   0x00020100u,
+                                   0x0003FF00u,
+                                   0x000B0100u,
+                                   0x000C0200u,
+                                   0x000D0400u,
+                                   0x000E0800u,
+                                   0x000F1000u,
+                                   0x00102000u,
+                                   0x00114000u,
+                                   0x00128000u,
+                                   0x00130100u,
+                                   0x00140200u,
+                                   0x00150400u,
+                                   0x00160800u,
+                                   0x00171000u,
+                                   0x00182000u,
+                                   0x00194000u,
+                                   0x001A8000u,
+                                   0x001BFFFFu,
+                                   0x0023FFFFu,
+                                   0x002BFFFFu,
+                                   0x0033FFFFu,
+                                   0x003BFFFFu,
+                                   0x0043FFFFu,
+                                   0x004BFFFFu,
+                                   0x0053FFFFu);
 
-const float[6] scale_lookup = float[6](1., .5, .25, .125, .0625, .03125);
+const float[] scale_lookup = float[](1.0,
+                                     0.5,
+                                     0.25,
+                                     0.125,
+                                     0.0625,
+                                     0.03125,
+                                     0.015625,
+                                     0.0078125,
+                                     0.00390625,
+                                     0.001953125,
+                                     0.0009765625,
+                                     0.00048828125);
 
 // returns t0 and t1, also fills tmid and tmax
 bool isect(out float tcmin,
@@ -185,8 +53,10 @@ bool isect(out float tcmin,
            float size,
            vec3 rayPos,
            vec3 rayDir) {
-  vec3 minCorner = pos - 0.5 * size;
-  vec3 maxCorner = pos + 0.5 * size;
+  vec3 halfSize  = vec3(0.5 * size);
+  vec3 minCorner = pos - halfSize;
+  vec3 maxCorner = pos + halfSize;
+
   // xyz components of t for the ray to get to the 3 planes of minCorner
   vec3 t1 = (minCorner - rayPos) / rayDir;
   // xyz ...
@@ -250,20 +120,18 @@ vec4 trace(out bool hit,
            out float tcmax,
            out vec3 pos,
            out int iter_used,
-           out float size,
            in vec3 rayPos,
            in vec3 rayDir) {
-  const vec4 kBlack = vec4(0.0, 0.0, 0.0, 1.0);
-  const vec4 kRed   = vec4(1.0, 0.0, 0.0, 1.0);
-  const vec4 kGreen = vec4(0.0, 1.0, 0.0, 1.0);
-  const vec4 kBlue  = vec4(0.0, 0.0, 1.0, 1.0);
-  const vec4 kGray  = vec4(0.5, 0.5, 0.5, 1.0);
+  const vec4 kBlack   = vec4(0.0, 0.0, 0.0, 1.0);
+  const vec4 kRed     = vec4(1.0, 0.0, 0.0, 1.0);
+  const vec4 kGreen   = vec4(0.0, 1.0, 0.0, 1.0);
+  const vec4 kBlue    = vec4(0.0, 0.0, 1.0, 1.0);
+  const vec4 kMagenta = vec4(0.5, 0.2, 0.5, 1.0);
 
   struct ST
   {
     vec3 pos;
-    int scale; // size = root_size * exp2(float(-scale)), we used a loopup table
-               // to get the size
+    int scale; // size = exp2(float(-scale)), a lookup table is used
     vec3 idx;
     uint ptr;
     float h;
@@ -273,13 +141,13 @@ vec4 trace(out bool hit,
   hit           = false;
 
   // STEP 1: initialize
+  int scale = 0;
 
-  size          = root_size;
-  vec3 root_pos = vec3(0);
-  pos           = root_pos;
+  pos = vec3(0);
   vec3 tmid, tmax;
-  bool can_push               = true;
-  bool is_intersect_with_root = isect(tcmin, tcmax, tmid, tmax, pos, size, rayPos, rayDir);
+  bool can_push = true;
+  bool is_intersect_with_root =
+      isect(tcmin, tcmax, tmid, tmax, pos, scale_lookup[scale], rayPos, rayDir);
   if (!is_intersect_with_root) {
     return kBlack;
   }
@@ -292,11 +160,10 @@ vec4 trace(out bool hit,
   vec3 idx = mix(-sign(rayDir), sign(rayDir), step(tmid, vec3(tcmin)));
 
   uint byte_offset = 0u;
-  int scale        = 1;
-  size *= 0.5;
+  scale++;
 
   // move to first hitted sub-cell center
-  pos += 0.5 * size * idx;
+  pos += scale_lookup[scale + 1] * idx;
 
   iter_used = 0;
   while (iter_used++ < MAX_ITER) {
@@ -304,11 +171,12 @@ vec4 trace(out bool hit,
     vec3 idx01      = idx * .5 + .5;
     uint bit_offset = uint(dot(idx01, vec3(1., 2., 4.))); // 0-7
 
+    isect(tcmin, tcmax, tmid, tmax, pos, scale_lookup[scale], rayPos, rayDir);
+
     uint next_byte_offset;
     bool has_voxel, is_leaf;
+    // TODO: don't fetch if not necessary (store them in stack)
     fetch_voxel_buffer(next_byte_offset, has_voxel, is_leaf, byte_offset, bit_offset);
-
-    isect(tcmin, tcmax, tmid, tmax, pos, size, rayPos, rayDir);
 
     // [PUSH] repeatedly, until empty voxel is found
     // when pushed layer reached the same level as the smallest voxel, stop
@@ -328,7 +196,6 @@ vec4 trace(out bool hit,
 
       h = tcmax;
       scale++;
-      size *= 0.5;
 
       // step: for element i of the return value, 0.0 is returned if x[i] <
       // edge[i], and 1.0 is returned otherwise.
@@ -336,7 +203,7 @@ vec4 trace(out bool hit,
 
       byte_offset = next_byte_offset;
 
-      pos += 0.5 * size * idx;
+      pos += scale_lookup[scale + 1] * idx;
       continue;
     }
 
@@ -353,24 +220,24 @@ vec4 trace(out bool hit,
     if (idx == old) {
       // if poped all the way to the root
       // if (stack_ptr == 0 || scale == 0)
-      if (stack_ptr == 0)
-        return kGray;
+      if (stack_ptr == 0) {
+        return kMagenta;
+      }
 
       ST s        = stack[--stack_ptr]; // restore to parent Stack
       pos         = s.pos;
       scale       = s.scale;
-      size        = root_size * scale_lookup[scale];
       idx         = s.idx;
       byte_offset = s.ptr;
       h           = s.h;
 
-      // once stack pop out,get rid out pushing in again
+      // once stack pop out, avoid pushing it in again
       can_push = false;
     }
     // idx has changed -> [ADVANCE]
     else {
       // if old = idx → stay,else → move forward in this stack
-      pos += mix(vec3(0.), sign(rayDir), notEqual(old, idx)) * size;
+      pos += mix(vec3(0.), sign(rayDir), notEqual(old, idx)) * scale_lookup[scale];
       can_push = true;
     }
   }
@@ -415,13 +282,12 @@ void mainImage(out vec4 fragColor, in vec2 fragCoord) {
   float tcmin, tcmax;
   bool hit;
   vec3 pos;
-  float size;
   int iter_used;
-  fragColor = trace(hit, tcmin, tcmax, pos, iter_used, size, rayPos, rayDir);
+  fragColor = trace(hit, tcmin, tcmax, pos, iter_used, rayPos, rayDir);
 
   // customized shading
   if (hit) {
-    // fragColor = vec4(vec3(float(iter_used) / 10.0), 1.0);
-    fragColor = vec4(vec3(exp(-tcmin)), 1.0);
+    fragColor = vec4(vec3(float(iter_used) / 10.0), 1.0);
+    // fragColor = vec4(vec3(exp(-tcmin)), 1.0);
   }
 }

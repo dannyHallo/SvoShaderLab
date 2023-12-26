@@ -28,24 +28,24 @@ const std::vector<Coor3D> kBuildVoxelCoors{
     {7, 7, 0},
     {7, 7, 7},
 
-    {3, 3, 3},
-    {3, 4, 3},
-    {3, 3, 4},
-    {3, 4, 4},
-    {4, 3, 3},
-    {4, 4, 3},
-    {4, 3, 4},
-    {4, 4, 4},
+    // {3, 3, 3},
+    // {3, 4, 3},
+    // {3, 3, 4},
+    // {3, 4, 4},
+    // {4, 3, 3},
+    // {4, 4, 3},
+    // {4, 3, 4},
+    // {4, 4, 4},
 
 };
 
 void build(ImageData *imageData, Coor3D const &imageSize) {
-  _buildPlane(imageData, imageSize, 0);               // bottom plane
-  _buildPlane(imageData, imageSize, imageSize.y - 1); // top plane
+  // _buildPlane(imageData, imageSize, 0);               // bottom plane
+  // _buildPlane(imageData, imageSize, imageSize.y - 1); // top plane
 
-  // for (auto const &coor : kBuildVoxelCoors) {
-  //   _buildVoxel(imageData, coor);
-  // }
+  for (auto const &coor : kBuildVoxelCoors) {
+    _buildVoxel(imageData, coor);
+  }
 }
 
 } // namespace BaseLevelBuilder

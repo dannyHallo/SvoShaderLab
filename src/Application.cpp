@@ -59,7 +59,7 @@ void Application::run() {
 }
 
 void Application::_buildImageDatas() {
-  Coor3D const kBaseImageSize = {8, 8, 8};
+  Coor3D const kBaseImageSize = {32, 32, 32};
   Coor3D const kRootImageSize = {1, 1, 1};
 
   // assert all components in the size should be a power of 2
