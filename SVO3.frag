@@ -3,33 +3,7 @@
 const int MAX_ITER    = 100;
 const uint kMaxLevels = 10u;
 
-const uint voxel_buffer[] = uint[](0x00010100u,
-                                   0x00020100u,
-                                   0x0003FF00u,
-                                   0x000B0100u,
-                                   0x000C0200u,
-                                   0x000D0400u,
-                                   0x000E0800u,
-                                   0x000F1000u,
-                                   0x00102000u,
-                                   0x00114000u,
-                                   0x00128000u,
-                                   0x00130100u,
-                                   0x00140200u,
-                                   0x00150400u,
-                                   0x00160800u,
-                                   0x00171000u,
-                                   0x00182000u,
-                                   0x00194000u,
-                                   0x001A8000u,
-                                   0x001BFFFFu,
-                                   0x0023FFFFu,
-                                   0x002BFFFFu,
-                                   0x0033FFFFu,
-                                   0x003BFFFFu,
-                                   0x0043FFFFu,
-                                   0x004BFFFFu,
-                                   0x0053FFFFu);
+const uint voxel_buffer[] = uint[]();
 
 const float[] scale_lookup = float[](1.0,
                                      0.5,
